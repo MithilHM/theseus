@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import useSWR from 'swr';
 import ShipView from '@/components/ship/ShipView';
 import Modal from '@/components/dashboard/Modal';
+import { useDemoMode } from '@/lib/demoContext';
 import { 
   fetchSummary, 
   fetchForecast, 
@@ -30,29 +31,49 @@ export default function HomePage() {
   const [invoiceReminderDraft, setInvoiceReminderDraft] = useState('');
   const [draftingInvoice, setDraftingInvoice] = useState(false);
 
+  // Demo mode state
+  const { demoMode } = useDemoMode();
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const prevCashRef = useRef<number | null>(null);
+
   useEffect(() => {
     const saved = localStorage.getItem('theseus_lang');
     if (saved) setSelectedLanguage(saved);
   }, []);
 
-  // Poll summary and analytics so visual advances dynamically
-  const { data: summary } = useSWR(
+  // Poll summary, forecast and recommendations at custom speeds driven by demoMode
+  const { data: summary, error: summaryErr } = useSWR(
     `summary-${ORG_ID}`, 
     () => fetchSummary(ORG_ID), 
-    { refreshInterval: 4000 }
+    { refreshInterval: demoMode ? 1500 : 4000 }
   );
 
   const { data: forecast90 } = useSWR(
     `forecast-90-${ORG_ID}`, 
     () => fetchForecast(ORG_ID, 90), 
-    { refreshInterval: 8000 }
+    { refreshInterval: demoMode ? 3000 : 8000 }
   );
 
   const { data: recommendations } = useSWR(
     `recs-${ORG_ID}`, 
     () => fetchRecommendations(ORG_ID), 
-    { refreshInterval: 6000 }
+    { refreshInterval: demoMode ? 2000 : 6000 }
   );
+
+  // Monitor cash balance changes to show visual toast alert
+  useEffect(() => {
+    if (summary?.cash_balance !== undefined) {
+      if (prevCashRef.current !== null && prevCashRef.current !== summary.cash_balance) {
+        setToastMessage(`New transactions synced! Cash Balance updated to: ${formatINR(summary.cash_balance)}`);
+        setShowToast(true);
+        const timer = setTimeout(() => setShowToast(false), 2200);
+        prevCashRef.current = summary.cash_balance;
+        return () => clearTimeout(timer);
+      }
+      prevCashRef.current = summary.cash_balance;
+    }
+  }, [summary?.cash_balance]);
 
   const handleWaterClick = () => {
     setModalType('water');
@@ -73,7 +94,6 @@ export default function HomePage() {
     setDraftingInvoice(true);
 
     try {
-      // Fetch automated draft email from course of action endpoint for invoice ID 3
       const res = await fetchReminderDraft(3, ORG_ID, selectedLanguage);
       setInvoiceReminderDraft(res.draft);
     } catch (err: any) {
@@ -116,39 +136,62 @@ export default function HomePage() {
     },
   ];
 
+  const isLoading = !summary || !forecast90;
+
   return (
     <div className="relative w-full h-[calc(100vh-50px)] overflow-hidden bg-slate-900">
       
+      {/* Dynamic Sync Toast */}
+      {showToast && (
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-extrabold text-[11px] py-2.5 px-6 rounded-full shadow-2xl border border-blue-400 animate-bounce tracking-wide">
+          ⚡ {toastMessage}
+        </div>
+      )}
+
       {/* HUD Info Overlay Card */}
-      <div className="absolute top-4 left-4 z-20 w-80 bg-slate-905/80 backdrop-blur-md border border-slate-800 rounded-xl p-4 space-y-3 pointer-events-auto">
+      <div className="absolute top-4 left-4 z-20 w-80 bg-slate-900/85 backdrop-blur-md border border-slate-800 rounded-xl p-4 space-y-3 pointer-events-auto shadow-2xl">
         <div>
-          <span className="text-[9px] uppercase tracking-widest text-blue-500 font-bold">Glanceable Financial Helm</span>
+          <span className="text-[9px] uppercase tracking-widest text-blue-500 font-extrabold">Glanceable Financial Helm</span>
           <h2 className="text-sm font-black text-white mt-0.5">THE SHIP OF THESEUS</h2>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 text-[10px]">
-          <div className="bg-slate-950/40 p-2 rounded border border-slate-800/60">
-            <span className="text-slate-400 block text-[8px] uppercase tracking-wider">Cash Balance</span>
-            <span className="font-extrabold text-white text-xs">{formatINR(summary?.cash_balance ?? 435000)}</span>
+        {isLoading ? (
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="h-10 rounded bg-slate-800/50 skeleton-loader" />
+              <div className="h-10 rounded bg-slate-800/50 skeleton-loader" />
+              <div className="h-10 rounded bg-slate-800/50 skeleton-loader" />
+              <div className="h-10 rounded bg-slate-800/50 skeleton-loader" />
+            </div>
+            <div className="h-12 rounded bg-slate-800/50 skeleton-loader" />
           </div>
-          <div className="bg-slate-950/40 p-2 rounded border border-slate-800/60">
-            <span className="text-slate-400 block text-[8px] uppercase tracking-wider">Runway Days</span>
-            <span className="font-extrabold text-amber-500 text-xs">{summary?.runway_days ?? 75} Days</span>
-          </div>
-          <div className="bg-slate-950/40 p-2 rounded border border-slate-800/60">
-            <span className="text-slate-400 block text-[8px] uppercase tracking-wider">Shortfall Risk</span>
-            <span className="font-extrabold text-rose-500 text-xs">{Math.round((forecast90?.shortfall_risk ?? 0.15) * 100)}%</span>
-          </div>
-          <div className="bg-slate-950/40 p-2 rounded border border-slate-800/60">
-            <span className="text-slate-400 block text-[8px] uppercase tracking-wider">Forecast Spread</span>
-            <span className="font-extrabold text-indigo-400 text-xs">{Math.round((forecast90?.forecast_confidence_volatility ?? 0.18) * 100)}% Vol</span>
-          </div>
-        </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-2 text-[10px]">
+              <div className="bg-slate-950/40 p-2 rounded border border-slate-800/60">
+                <span className="text-slate-400 block text-[8px] uppercase tracking-wider">Cash Balance</span>
+                <span className="font-extrabold text-white text-xs">{formatINR(summary?.cash_balance ?? 435000)}</span>
+              </div>
+              <div className="bg-slate-950/40 p-2 rounded border border-slate-800/60">
+                <span className="text-slate-400 block text-[8px] uppercase tracking-wider">Runway Days</span>
+                <span className="font-extrabold text-amber-500 text-xs">{summary?.runway_days ?? 75} Days</span>
+              </div>
+              <div className="bg-slate-950/40 p-2 rounded border border-slate-800/60">
+                <span className="text-slate-400 block text-[8px] uppercase tracking-wider">Shortfall Risk</span>
+                <span className="font-extrabold text-rose-500 text-xs">{Math.round((forecast90?.shortfall_risk ?? 0.15) * 100)}%</span>
+              </div>
+              <div className="bg-slate-950/40 p-2 rounded border border-slate-800/60">
+                <span className="text-slate-400 block text-[8px] uppercase tracking-wider">Forecast Spread</span>
+                <span className="font-extrabold text-indigo-400 text-xs">{Math.round((forecast90?.forecast_confidence_volatility ?? 0.18) * 100)}% Vol</span>
+              </div>
+            </div>
 
-        <div className="text-[9.5px] leading-relaxed text-slate-300 bg-slate-950/60 p-2 rounded border border-slate-850">
-          <strong className="text-blue-400 font-bold block">Course Direction Recommendation:</strong>
-          {recommendations?.[0]?.description || 'Runway stable. Clear Acme outstanding invoice.'}
-        </div>
+            <div className="text-[9.5px] leading-relaxed text-slate-350 bg-slate-950/60 p-2 rounded border border-slate-800/80">
+              <strong className="text-blue-400 font-bold block">Course Direction Recommendation:</strong>
+              {recommendations?.[0]?.description || 'Runway stable. Clear Acme outstanding invoice.'}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Main Full-Screen Ship Canvas */}
@@ -166,6 +209,7 @@ export default function HomePage() {
           showAnnotations={true}
           onWaterClick={handleWaterClick}
           onShipClick={handleShipClick}
+          loading={isLoading}
         />
       </div>
 
@@ -207,7 +251,7 @@ export default function HomePage() {
       >
         <div className="space-y-3">
           <p className="font-bold text-slate-800">Metaphor: Trireme Draft = Operational Runway</p>
-          <p className="text-slate-600">
+          <p className="text-slate-650">
             A ship loaded heavily riding low in the water or listing represents a critically short cash runway. A light, high galley is agile and safe.
           </p>
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
@@ -230,18 +274,18 @@ export default function HomePage() {
         title="Glanceable Metaphor: Water Turbulence & Waves (Forecast Volatility)"
       >
         <div className="space-y-3">
-          <p className="font-bold text-slate-800">Metaphor: Waves = Monte Carlo Forecast Volatility</p>
+          <p className="font-bold text-slate-850">Metaphor: Waves = Monte Carlo Forecast Volatility</p>
           <p className="text-slate-600">
             Calm waters represent a stable, highly confident forecast with low variance. Choppy waves reflect a high forecast spread (P90 vs P10 spread) suggesting unpredictable upcoming flows.
           </p>
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
             <div className="flex justify-between">
               <span>Forecast Confidence Spread:</span>
-              <span className="font-bold text-indigo-600">{Math.round((forecast90?.forecast_confidence_volatility ?? 0.18) * 100)}%</span>
+              <span className="font-bold text-indigo-650">{Math.round((forecast90?.forecast_confidence_volatility ?? 0.18) * 100)}%</span>
             </div>
             <div className="flex justify-between">
               <span>Simulated Shortfall Probability:</span>
-              <span className="font-bold text-rose-500">{Math.round((forecast90?.shortfall_risk ?? 0.15) * 100)}%</span>
+              <span className="font-bold text-rose-550">{Math.round((forecast90?.shortfall_risk ?? 0.15) * 100)}%</span>
             </div>
           </div>
         </div>
@@ -255,7 +299,7 @@ export default function HomePage() {
       >
         <div className="space-y-3">
           <p className="font-bold text-slate-800">Resolve Outstanding Invoice Debt to Dissolve Iceberg</p>
-          <p className="text-slate-650">
+          <p className="text-slate-600">
             Icebergs represent immediate credit anomalies or outstanding invoices at high risk of payment delay. Draft an instant multilingual reminder:
           </p>
           
