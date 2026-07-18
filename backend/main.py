@@ -4,6 +4,7 @@ from agents.onboarding import router as onboarding_router
 from agents.analytics import router as analytics_router
 from agents.course_of_action import router as coa_router
 from agents.document_intelligence import router as doc_intel_router
+from agents.email import router as email_router
 
 from core.config import settings
 from agents.onboarding.simulated_feed import start_simulated_feed, stop_simulated_feed
@@ -22,6 +23,7 @@ app.include_router(onboarding_router.router, prefix="/api/onboarding", tags=["on
 app.include_router(analytics_router.router, prefix="/api/analytics", tags=["analytics"])
 app.include_router(coa_router.router, prefix="/api/course_of_action", tags=["course_of_action"])
 app.include_router(doc_intel_router.router, prefix="/api/document_intelligence", tags=["document_intelligence"])
+app.include_router(email_router.router, prefix="/api/email", tags=["email"])
 
 @app.on_event("startup")
 def startup_event():

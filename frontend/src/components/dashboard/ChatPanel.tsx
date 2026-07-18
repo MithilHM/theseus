@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { askCopilot, askDocumentIntelligence, DocumentCitation } from '@/lib/api';
+import { askCopilot, askDocumentIntelligence, DocumentCitation, draftEmail, previewEmail, sendEmail, isEmailRequest, EmailDraft } from '@/lib/api';
 import VoiceNoteWidget from './VoiceNoteWidget';
 
 interface ChatMessage {
@@ -9,6 +9,7 @@ interface ChatMessage {
   role: 'user' | 'gemma';
   text: string;
   citations?: DocumentCitation[];
+  emailDraft?: EmailDraft;
 }
 
 interface ChatPanelProps {
@@ -34,6 +35,9 @@ export default function ChatPanel({ orgId = 1, floating = false, onClose }: Chat
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [language, setLanguage] = useState('English');
   const [activeCitation, setActiveCitation] = useState<DocumentCitation | null>(null);
+  const [emailPreview, setEmailPreview] = useState<{ draft: EmailDraft; html: string } | null>(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [sendNotice, setSendNotice] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -80,8 +84,8 @@ export default function ChatPanel({ orgId = 1, floating = false, onClose }: Chat
     try {
       let responseText = '';
       let citations: DocumentCitation[] = [];
+      let emailDraft: EmailDraft | undefined;
 
-      // Append language context suffix if language is not English
       const augmentedQuestion = language !== 'English' 
         ? `${text} (Please respond in ${language})` 
         : text;
@@ -90,6 +94,15 @@ export default function ChatPanel({ orgId = 1, floating = false, onClose }: Chat
         const docRes = await askDocumentIntelligence(orgId, augmentedQuestion);
         responseText = docRes.answer;
         citations = docRes.citations;
+      } else if (isEmailRequest(text)) {
+        emailDraft = await draftEmail(orgId, augmentedQuestion, language);
+        responseText = (
+          `I've drafted an email for your review.\n\n` +
+          `To: ${emailDraft.recipient}\n` +
+          `Subject: ${emailDraft.subject}\n\n` +
+          `${emailDraft.body}\n\n` +
+          `Use Preview to review formatting, then Send when you're ready.`
+        );
       } else {
         const copilotRes = await askCopilot(orgId, augmentedQuestion);
         responseText = copilotRes.answer;
@@ -102,6 +115,7 @@ export default function ChatPanel({ orgId = 1, floating = false, onClose }: Chat
           role: 'gemma',
           text: responseText,
           citations: citations.length > 0 ? citations : undefined,
+          emailDraft,
         },
       ]);
     } catch (err: any) {
@@ -126,6 +140,29 @@ export default function ChatPanel({ orgId = 1, floating = false, onClose }: Chat
       handleSend(desc);
     } else {
       handleSend('Processed voice transaction note.');
+    }
+  };
+
+  const handlePreviewEmail = async (draft: EmailDraft) => {
+    try {
+      const preview = await previewEmail(draft);
+      setEmailPreview({ draft, html: preview.html_preview });
+    } catch (err: any) {
+      setSendNotice(`Preview failed: ${err.message}`);
+    }
+  };
+
+  const handleSendEmail = async (draft: EmailDraft) => {
+    setSendingEmail(true);
+    setSendNotice(null);
+    try {
+      const result = await sendEmail(draft);
+      setSendNotice(result.message);
+      setEmailPreview(null);
+    } catch (err: any) {
+      setSendNotice(`Send failed: ${err.message}`);
+    } finally {
+      setSendingEmail(false);
     }
   };
 
@@ -212,6 +249,25 @@ export default function ChatPanel({ orgId = 1, floating = false, onClose }: Chat
                 <p className="whitespace-pre-wrap">{msg.text}</p>
               </div>
 
+              {/* Email draft actions */}
+              {msg.emailDraft && (
+                <div className="flex flex-wrap gap-1.5 pl-1">
+                  <button
+                    onClick={() => handlePreviewEmail(msg.emailDraft!)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-700 text-[9px] font-semibold transition-all"
+                  >
+                    Preview
+                  </button>
+                  <button
+                    onClick={() => handleSendEmail(msg.emailDraft!)}
+                    disabled={sendingEmail}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 text-emerald-700 text-[9px] font-semibold transition-all disabled:opacity-50"
+                  >
+                    {sendingEmail ? 'Sending…' : 'Send Email'}
+                  </button>
+                </div>
+              )}
+
               {/* Citations List if present */}
               {msg.citations && msg.citations.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 pl-1">
@@ -265,6 +321,17 @@ export default function ChatPanel({ orgId = 1, floating = false, onClose }: Chat
         </div>
       )}
 
+      {/* Send success / failure notice */}
+      {sendNotice && (
+        <div className={`mx-3 mb-2 px-3 py-2 rounded-lg text-[10px] font-medium border ${
+          sendNotice.toLowerCase().includes('fail') || sendNotice.toLowerCase().includes('invalid')
+            ? 'bg-rose-50 border-rose-200 text-rose-700'
+            : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+        }`}>
+          {sendNotice}
+        </div>
+      )}
+
       {/* Input panel footer */}
       <div className="border-t border-slate-100 px-3 py-2.5 bg-white flex items-center gap-2 shrink-0">
         {/* Voice recorder toggle button */}
@@ -302,6 +369,44 @@ export default function ChatPanel({ orgId = 1, floating = false, onClose }: Chat
           </svg>
         </button>
       </div>
+
+      {/* Email Preview Modal */}
+      {emailPreview && (
+        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-11/12 max-w-lg max-h-[85%] flex flex-col border border-slate-200">
+            <div className="flex justify-between items-center px-4 py-2.5 border-b border-slate-150 bg-slate-50 rounded-t-xl">
+              <span className="text-[10px] font-bold text-slate-700">Email Preview</span>
+              <button
+                onClick={() => setEmailPreview(null)}
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto flex-1">
+              <div
+                className="border border-slate-200 rounded-lg overflow-hidden"
+                dangerouslySetInnerHTML={{ __html: emailPreview.html }}
+              />
+            </div>
+            <div className="flex gap-2 px-4 py-3 border-t border-slate-150 bg-slate-50 rounded-b-xl">
+              <button
+                onClick={() => setEmailPreview(null)}
+                className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-[10px] font-semibold text-slate-600 hover:bg-white"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => handleSendEmail(emailPreview.draft)}
+                disabled={sendingEmail}
+                className="flex-1 px-3 py-1.5 rounded-lg bg-emerald-500 text-white text-[10px] font-semibold hover:bg-emerald-600 disabled:opacity-50"
+              >
+                {sendingEmail ? 'Sending…' : 'Approve & Send'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Citation Detail Overlay Modal */}
       {activeCitation && (

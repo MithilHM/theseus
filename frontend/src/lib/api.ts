@@ -233,3 +233,90 @@ export async function simulateScenario(orgId: number, scenarioId: number): Promi
   return res.json();
 }
 
+// ── Email Delivery API Wrappers ───────────────────────────────────────────────
+export interface EmailDraft {
+  subject: string;
+  recipient: string;
+  body: string;
+  email_type: string;
+  customer_name?: string;
+  invoice_id?: number;
+}
+
+export interface EmailPreview {
+  subject: string;
+  recipient: string;
+  body: string;
+  html_preview: string;
+}
+
+export interface EmailSendResult {
+  success: boolean;
+  message: string;
+  mock?: boolean;
+  recipient?: string;
+  subject?: string;
+}
+
+export async function draftEmail(
+  orgId: number,
+  request: string,
+  language: string = 'English'
+): Promise<EmailDraft> {
+  const res = await fetch(`${API_BASE}/email/draft`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ org_id: orgId, request, language }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to draft email');
+  }
+  return res.json();
+}
+
+export async function previewEmail(draft: EmailDraft): Promise<EmailPreview> {
+  const res = await fetch(`${API_BASE}/email/preview`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      subject: draft.subject,
+      recipient: draft.recipient,
+      body: draft.body,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to preview email');
+  }
+  return res.json();
+}
+
+export async function sendEmail(draft: EmailDraft): Promise<EmailSendResult> {
+  const res = await fetch(`${API_BASE}/email/send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      subject: draft.subject,
+      recipient: draft.recipient,
+      body: draft.body,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(typeof err.detail === 'string' ? err.detail : 'Failed to send email');
+  }
+  return res.json();
+}
+
+export function isEmailRequest(text: string): boolean {
+  const lower = text.toLowerCase();
+  return (
+    (lower.includes('send') && (lower.includes('email') || lower.includes('mail') || lower.includes('reminder'))) ||
+    (lower.includes('draft') && lower.includes('email')) ||
+    lower.includes('payment reminder') ||
+    lower.includes('weekly summary') ||
+    lower.includes('escalat')
+  );
+}
+
