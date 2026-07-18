@@ -34,7 +34,7 @@ body {
     transform: translateX(0);
   }
   to {
-    transform: translateX(-420px);
+    transform: translateX(-300px);
   }
 }
 

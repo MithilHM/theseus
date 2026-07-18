@@ -33,20 +33,21 @@ export default function WaterLayer({
 
   // Wave amplitude: calm ≈ 4px, choppy ≈ 30px
   const amplitude = 4 + forecastVolatility * 26;
-  // Wavelength stays fixed; phase scroll speed is tied to volatility
-  const waveLen = viewW * 0.35;
+  // Fixed wavelength to align with CSS keyframe animation
+  const waveLen = 300;
 
-  // Build a sine-wave path across the full width, then close to the bottom.
+  // Build a sine-wave path across the full width plus one wavelength, then close to the bottom.
   const buildWavePath = (phase: number, amp: number): string => {
-    const steps = 60;
-    const dx = viewW / steps;
+    const steps = 80;
+    const totalW = viewW + waveLen;
+    const dx = totalW / steps;
     let d = `M 0 ${waterY}`;
     for (let i = 0; i <= steps; i++) {
       const x = i * dx;
       const y = waterY + Math.sin(((x + phase) / waveLen) * Math.PI * 2) * amp;
       d += ` L ${x} ${y}`;
     }
-    d += ` L ${viewW} ${viewH} L 0 ${viewH} Z`;
+    d += ` L ${totalW} ${viewH} L 0 ${viewH} Z`;
     return d;
   };
 
@@ -69,29 +70,40 @@ export default function WaterLayer({
         d={shadowPath}
         fill="url(#waterDeep)"
         opacity={0.85}
-        style={{
-          animation: `waveScroll ${animDuration * 1.3}s linear infinite`,
-        }}
-      />
+      >
+        <animateTransform
+          attributeName="transform"
+          type="translate"
+          from="0 0"
+          to="-300 0"
+          dur={`${animDuration * 1.3}s`}
+          repeatCount="indefinite"
+        />
+      </path>
       {/* Primary surface wave */}
       <path
         d={primaryPath}
         fill="url(#waterSurface)"
-        style={{
-          animation: `waveScroll ${animDuration}s linear infinite`,
-        }}
-      />
+      >
+        <animateTransform
+          attributeName="transform"
+          type="translate"
+          from="0 0"
+          to="-300 0"
+          dur={`${animDuration}s`}
+          repeatCount="indefinite"
+        />
+      </path>
 
       {/* Gradient definitions */}
       <defs>
         <linearGradient id="waterSurface" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.9" />
-          <stop offset="60%" stopColor="#0369a1" stopOpacity="0.95" />
-          <stop offset="100%" stopColor="#0c4a6e" stopOpacity="1" />
+          <stop offset="0%" stopColor="#8ED5E6" stopOpacity="0.95" />
+          <stop offset="100%" stopColor="#5EA9BD" stopOpacity="0.95" />
         </linearGradient>
         <linearGradient id="waterDeep" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#075985" stopOpacity="0.8" />
-          <stop offset="100%" stopColor="#082f49" stopOpacity="1" />
+          <stop offset="0%" stopColor="#559EB2" stopOpacity="0.9" />
+          <stop offset="100%" stopColor="#2E6B7C" stopOpacity="0.95" />
         </linearGradient>
       </defs>
     </g>

@@ -236,10 +236,14 @@ export default function ShipView({
         <defs>
           {/* Light sky gradient (day scene) */}
           <linearGradient id="skyGradV2" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={`hsl(205, 55%, ${skyLight}%)`} />
-            <stop offset="60%" stopColor={`hsl(208, 50%, ${skyMid}%)`} />
-            <stop offset="100%" stopColor={`hsl(210, 45%, ${Math.max(65, skyMid - 10)}%)`} />
+            <stop offset="0%" stopColor="#E9F2F9" />
+            <stop offset="100%" stopColor="#C9DCE8" />
           </linearGradient>
+
+          {/* Soft drop shadow for cards */}
+          <filter id="card-shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#0F172A" floodOpacity="0.08" />
+          </filter>
 
           {/* Horizon glow */}
           <linearGradient id="horizonGlow" x1="0" y1="0" x2="0" y2="1">
@@ -315,19 +319,20 @@ export default function ShipView({
               {/* Annotation box below waterline */}
               <rect
                 x={bx - 60}
-                y={waterY + 55}
+                y={waterY + 50}
                 width={120}
-                height={28}
+                height={32}
                 rx={4}
-                fill="rgba(15,23,42,0.75)"
-                stroke="rgba(148,163,184,0.2)"
-                strokeWidth={0.8}
+                fill={berg.severity === 'high' ? '#FEF2F2' : '#F8FAFC'}
+                stroke={berg.severity === 'high' ? '#FEE2E2' : '#F1F5F9'}
+                strokeWidth={1}
+                filter="url(#card-shadow)"
               />
-              <text x={bx} y={waterY + 67} textAnchor="middle" fontSize={7} fontWeight="bold" fill="#e2e8f0" fontFamily="sans-serif">
+              <text x={bx - 50} y={waterY + 64} textAnchor="start" fontSize={9} fontWeight="bold" fill={berg.severity === 'high' ? '#991B1B' : '#000'} fontFamily="sans-serif">
                 {berg.severity === 'high' ? 'Risk' : berg.severity === 'medium' ? 'Anomaly' : 'Alert'}
               </text>
-              <text x={bx} y={waterY + 79} textAnchor="middle" fontSize={6.5} fill="#94a3b8" fontFamily="sans-serif">
-                {berg.label.length > 20 ? berg.label.slice(0, 20) + '…' : berg.label}
+              <text x={bx - 50} y={waterY + 76} textAnchor="start" fontSize={8} fill="#334155" fontFamily="sans-serif">
+                {berg.label.length > 30 ? berg.label.slice(0, 30) + '…' : berg.label}
               </text>
             </g>
           );
@@ -343,28 +348,26 @@ export default function ShipView({
         />
 
         {/* ── THESEUS label ─────────────────────────────────────────────── */}
-        <g transform={`translate(${shipCX - 50}, ${waterY + 30})`}>
+        <g transform={`translate(${shipCX - 20}, ${waterY + 35})`}>
           <text
-            fontSize={11}
+            fontSize={12}
             fontWeight="bold"
-            fill="white"
+            fill="#1E293B"
             fontFamily="serif"
-            opacity={0.75}
             textAnchor="middle"
             x={0}
             y={0}
-            style={{ letterSpacing: '0.15em' }}
+            style={{ letterSpacing: '0.1em' }}
           >
-            'THESEUS'
+            &apos;THESEUS&apos;
           </text>
           <text
-            fontSize={8}
-            fill="rgba(255,255,255,0.55)"
+            fontSize={10}
+            fill="#334155"
             fontFamily="serif"
             textAnchor="middle"
             x={0}
             y={12}
-            style={{ letterSpacing: '0.05em' }}
           >
             Greek galley
           </text>
@@ -377,28 +380,29 @@ export default function ShipView({
               x={shipCX - 240}
               y={waterY - 130}
               width={180}
-              height={38}
+              height={40}
               rx={6}
-              fill="rgba(15,23,42,0.88)"
-              stroke="#22d3ee"
-              strokeWidth={0.8}
+              fill="#FFFFFF"
+              stroke="#E2E8F0"
+              strokeWidth={1}
+              filter="url(#card-shadow)"
             />
             <polygon
               points={`
-                ${shipCX - 200},${waterY - 92}
-                ${shipCX - 185},${waterY - 82}
-                ${shipCX - 215},${waterY - 92}
+                ${shipCX - 200},${waterY - 90}
+                ${shipCX - 185},${waterY - 80}
+                ${shipCX - 215},${waterY - 90}
               `}
-              fill="rgba(15,23,42,0.88)"
-              stroke="#22d3ee"
-              strokeWidth={0.8}
+              fill="#FFFFFF"
+              stroke="#E2E8F0"
+              strokeWidth={1}
             />
-            <text x={shipCX - 228} y={waterY - 115} fontSize={7.5} fill="#94a3b8" fontFamily="monospace">
-              GEMMA RECOMMENDS
+            <text x={shipCX - 228} y={waterY - 114} fontSize={8} fontWeight="bold" fill="#1E293B" fontFamily="'Inter', sans-serif">
+              Gemma Recommends
             </text>
-            <text x={shipCX - 228} y={waterY - 103} fontSize={8.5} fill="#e2e8f0" fontFamily="monospace">
-              {recommendationSummary.length > 24
-                ? recommendationSummary.slice(0, 24) + '…'
+            <text x={shipCX - 228} y={waterY - 102} fontSize={7} fill="#475569" fontFamily="'Inter', sans-serif">
+              {recommendationSummary.length > 30
+                ? recommendationSummary.slice(0, 30) + '…'
                 : recommendationSummary}
             </text>
           </g>
