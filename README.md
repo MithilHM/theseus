@@ -53,3 +53,17 @@ npm install
 npm run dev
 ```
 The frontend will run at `http://localhost:3000`.
+
+## Vercel Deployment & Demo Day Setup
+
+### Deploying the Frontend to Vercel
+1. Install the Vercel CLI: `npm install -g vercel` (or link your repository to Vercel's dashboard).
+2. Run `vercel` from the `theseus/frontend` directory.
+3. Configure the environment variable:
+   - **`NEXT_PUBLIC_API_URL`**: Point this to your deployed FastAPI backend URL (e.g., `https://theseus-backend.herokuapp.com/api` or your active ngrok/tunnel address `https://<subdomain>.ngrok-free.app/api`).
+4. Complete the deployment.
+
+### Deployed Frontend URL
+*   **Vercel Live URL**: [theseus-frontend.vercel.app](https://theseus-frontend.vercel.app) *(Update with your production URL once live)*
+*   **Demo Mode (Speed Sync)**: Toggle the **⚡ Speed Demo** button in the global navigation bar to double the simulation refresh speed and trigger transaction toasts.
+

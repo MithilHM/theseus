@@ -74,12 +74,12 @@ export default function ShipAnnotations({ annotations }: Props) {
               y1={ann.targetY}
               x2={lineEndX}
               y2={lineEndY}
-              stroke="rgba(255,255,255,0.5)"
+              stroke="#94A3B8"
               strokeWidth={1}
-              strokeDasharray="3 2"
+              strokeDasharray="2 2"
             />
-            {/* Small dot at target */}
-            <circle cx={ann.targetX} cy={ann.targetY} r={2.5} fill="white" opacity={0.7} />
+            {/* Small open circle at target */}
+            <circle cx={ann.targetX} cy={ann.targetY} r={3} fill="none" stroke="#94A3B8" strokeWidth={1} />
 
             {/* Callout box */}
             <rect
@@ -87,37 +87,45 @@ export default function ShipAnnotations({ annotations }: Props) {
               y={boxY}
               width={BOX_W}
               height={boxH}
-              rx={4}
-              fill="rgba(15, 23, 42, 0.82)"
-              stroke="rgba(148, 163, 184, 0.25)"
-              strokeWidth={0.8}
+              rx={6}
+              fill="#FFFFFF"
+              stroke="#E2E8F0"
+              strokeWidth={1}
+              filter="url(#card-shadow)"
             />
 
             {/* Title */}
             <text
               x={boxX + BOX_PAD}
               y={boxY + BOX_PAD + LINE_H - 2}
-              fontSize={8}
+              fontSize={8.5}
               fontWeight="bold"
-              fill="#e2e8f0"
+              fill="#1E293B"
               fontFamily="'Inter', sans-serif"
             >
               {ann.title}
             </text>
 
             {/* Detail lines */}
-            {ann.lines.map((line, i) => (
-              <text
-                key={i}
-                x={boxX + BOX_PAD}
-                y={boxY + BOX_PAD + (i + 2) * LINE_H - 2}
-                fontSize={7}
-                fill="#94a3b8"
-                fontFamily="'Inter', sans-serif"
-              >
-                {line}
-              </text>
-            ))}
+            {ann.lines.map((line, i) => {
+              const isRisk = line.includes('Risk: LOW');
+              return (
+                <text
+                  key={i}
+                  x={boxX + BOX_PAD}
+                  y={boxY + BOX_PAD + (i + 2) * LINE_H - 2}
+                  fontSize={7.5}
+                  fill="#475569"
+                  fontFamily="'Inter', sans-serif"
+                >
+                  {isRisk ? (
+                    <>Risk: <tspan fill="#10B981">LOW</tspan> (15%)</>
+                  ) : (
+                    line
+                  )}
+                </text>
+              );
+            })}
           </g>
         );
       })}
