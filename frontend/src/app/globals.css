@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #030712;
+  --foreground: #e2e8f0;
 }
 
 @theme inline {
@@ -12,15 +12,116 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   SHIP VISUALIZATION ANIMATIONS
+   All keyframes are referenced by inline style `animation:` props
+   in ShipView layer components.
+═══════════════════════════════════════════════════════════════════ */
+
+/**
+ * waveScroll — translates the wave path horizontally to simulate water motion.
+ * The animation value matches one full wavelength (35% of 1200px = 420px).
+ * The SVG path is built wide enough that the seam is invisible.
+ */
+@keyframes waveScroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-420px);
+  }
+}
+
+/**
+ * spikeGlow — pulses opacity for anomaly spike warning effect.
+ */
+@keyframes spikeGlow {
+  0%, 100% {
+    opacity: 0.88;
+    filter: brightness(1);
+  }
+  50% {
+    opacity: 0.55;
+    filter: brightness(1.4);
+  }
+}
+
+/**
+ * lightningFlicker — irregular flash for storm cloud lightning bolt.
+ */
+@keyframes lightningFlicker {
+  0%, 90%, 100% {
+    opacity: 0;
+  }
+  91%, 93% {
+    opacity: 0.9;
+  }
+  92% {
+    opacity: 0.2;
+  }
+}
+
+/**
+ * lighthousePulse — gentle glow pulse for island lighthouse beacons.
+ */
+@keyframes lighthousePulse {
+  0%, 100% {
+    opacity: 0.9;
+    r: 3;
+  }
+  50% {
+    opacity: 0.4;
+    r: 5;
+  }
+}
+
+/**
+ * fadeInOut — captain speech bubble entrance and exit.
+ */
+@keyframes fadeInOut {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/**
+ * captainWheelSpin — applied to the captain group when reacting to a new
+ * recommendation. The entire ship-body group gets this class temporarily.
+ */
+@keyframes captainWheelSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-8deg);
+  }
+  75% {
+    transform: rotate(8deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+.captain-reacting {
+  animation: captainWheelSpin 0.7s ease-in-out;
+  transform-origin: center center;
+}
+
