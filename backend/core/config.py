@@ -1,4 +1,9 @@
+import os
 from pydantic_settings import BaseSettings
+
+# Resolve path to the .env in root workspace directory
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ENV_PATH = os.path.join(BASE_DIR, "..", ".env")
 
 class Settings(BaseSettings):
     GEMMA_API_KEY: str = ""
@@ -19,6 +24,7 @@ class Settings(BaseSettings):
     EMAIL_MOCK: bool = True
 
     class Config:
-        env_file = ".env"
+        env_file = ENV_PATH
 
 settings = Settings()
+

@@ -124,10 +124,14 @@ def embed_and_store_chunks(
                 "embedding": str(embedding), # pgvector string cast
                 "metadata": json.dumps(chunk_metadata)
             })
+            db.commit()
             
         except Exception as e:
             logger.error(f"Failed to embed/store chunk {idx} for {source_name}: {e}")
+            try:
+                db.rollback()  # Reset the transaction so the session stays usable
+            except Exception:
+                pass
             continue
             
-    db.commit()
     logger.info(f"Successfully embedded and stored {len(chunks)} chunks for {source_name}")
