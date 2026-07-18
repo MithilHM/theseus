@@ -3,46 +3,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import useSWR from 'swr';
 import ShipView from '@/components/ship/ShipView';
-import Modal from '@/components/dashboard/Modal';
 import { useDemoMode } from '@/lib/demoContext';
-import { 
-  fetchSummary, 
-  fetchForecast, 
-  fetchRecommendations, 
-  fetchReminderDraft 
-} from '@/lib/api';
+import { fetchSummary, fetchForecast, fetchRecommendations } from '@/lib/api';
 
+// Hardcoded for demo
 const ORG_ID = 1;
 
-const formatINR = (v: number) => {
-  if (v === undefined || v === null || isNaN(v)) return '₹0';
-  const val = Math.abs(v);
-  const prefix = v < 0 ? '-' : '';
-  if (val >= 100000) {
-    return `${prefix}₹${(val / 100000).toFixed(2)}L`;
-  }
-  return `${prefix}₹${Math.round(val / 1000)}K`;
-};
+const formatINR = (v: number) =>
+  v >= 100000
+    ? `₹${(v / 100000).toFixed(2)}L`
+    : `₹${Math.round(v / 1000)}K`;
 
 export default function HomePage() {
-  const [selectedLanguage, setSelectedLanguage] = useState('English');
-  const [modalType, setModalType] = useState<'water' | 'ship' | 'iceberg' | 'forecast' | null>(null);
-  const [activeIceberg, setActiveIceberg] = useState<{ id: string; label: string } | null>(null);
-  const [invoiceReminderDraft, setInvoiceReminderDraft] = useState('');
-  const [draftingInvoice, setDraftingInvoice] = useState(false);
-
-  // Demo mode state
   const { demoMode } = useDemoMode();
-  const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-  const prevCashRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    const saved = localStorage.getItem('theseus_lang');
-    if (saved) setSelectedLanguage(saved);
-  }, []);
-
-  // Poll summary, forecast and recommendations at custom speeds driven by demoMode
+  
+  // Poll summary, forecast and recommendations
   const { data: summary, error: summaryErr } = useSWR(
     `summary-${ORG_ID}`, 
     () => fetchSummary(ORG_ID), 
@@ -61,61 +36,21 @@ export default function HomePage() {
     { refreshInterval: demoMode ? 2000 : 6000 }
   );
 
-  // Monitor cash balance changes to show visual toast alert
-  useEffect(() => {
-    if (summary?.cash_balance !== undefined) {
-      if (prevCashRef.current !== null && prevCashRef.current !== summary.cash_balance) {
-        setToastMessage(`New transactions synced! Cash Balance updated to: ${formatINR(summary.cash_balance)}`);
-        setShowToast(true);
-        const timer = setTimeout(() => setShowToast(false), 2200);
-        prevCashRef.current = summary.cash_balance;
-        return () => clearTimeout(timer);
-      }
-      prevCashRef.current = summary.cash_balance;
-    }
-  }, [summary?.cash_balance]);
+  const isLoading = !summary || !forecast90;
 
-  const handleWaterClick = () => {
-    setModalType('water');
-  };
-
-  const handleShipClick = () => {
-    setModalType('ship');
-  };
-
-  const handleWaveClick = () => {
-    setModalType('forecast');
-  };
-
-  const handleIcebergClick = async (bergId: string, label: string) => {
-    setActiveIceberg({ id: bergId, label });
-    setModalType('iceberg');
-    setInvoiceReminderDraft('');
-    setDraftingInvoice(true);
-
-    try {
-      const res = await fetchReminderDraft(3, ORG_ID, selectedLanguage);
-      setInvoiceReminderDraft(res.draft);
-    } catch (err: any) {
-      setInvoiceReminderDraft(`Dear Customer,\n\nThis is a notification that invoice details relating to "${label}" are outstanding. Please clear the pending balance.\n\nBest regards.`);
-    } finally {
-      setDraftingInvoice(false);
-    }
-  };
-
-  // Compile icebergs list
+  // Compile icebergs list (same as upstream)
   const computedIcebergs = [
     {
       id: 'icb-acme',
       label: 'Customer Acme Overdue',
       severity: 'high' as const,
-      onClick: () => handleIcebergClick('icb-acme', 'Customer Acme Overdue'),
+      onClick: () => console.log('clicked icb-acme'),
     },
     {
       id: 'icb-anomaly',
       label: 'Anomaly: Spend Spike',
       severity: 'medium' as const,
-      onClick: () => handleIcebergClick('icb-anomaly', 'Anomaly: Spend Spike'),
+      onClick: () => console.log('clicked icb-anomaly'),
     },
   ];
 
@@ -124,7 +59,7 @@ export default function HomePage() {
       id: 'isl-q3',
       label: 'Q3 Revenue Port',
       distancePct: 0.8,
-      onClick: () => handleWaterClick(),
+      onClick: () => console.log('clicked isl-q3'),
     },
   ];
 
@@ -132,211 +67,66 @@ export default function HomePage() {
     {
       id: 'spike-forecast',
       positionPct: 0.65,
-      onClick: handleWaveClick,
+      onClick: () => console.log('clicked spike'),
     },
   ];
 
-  const isLoading = !summary || !forecast90;
-
   return (
-    <div className="relative w-full h-[calc(100vh-50px)] overflow-hidden bg-slate-900">
+    <div className="flex w-full h-screen bg-[#EAF6FF] overflow-hidden font-sans">
       
-      {/* Dynamic Sync Toast */}
-      {showToast && (
-        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-extrabold text-[11px] py-2.5 px-6 rounded-full shadow-2xl border border-blue-400 animate-bounce tracking-wide">
-          ⚡ {toastMessage}
-        </div>
-      )}
-
-      {/* HUD Info Overlay Card */}
-      <div className="absolute top-4 left-4 z-20 w-80 bg-slate-900/85 backdrop-blur-md border border-slate-800 rounded-xl p-4 space-y-3 pointer-events-auto shadow-2xl">
-        <div>
-          <span className="text-[9px] uppercase tracking-widest text-blue-500 font-extrabold">Glanceable Financial Helm</span>
-          <h2 className="text-sm font-black text-white mt-0.5">THE SHIP OF THESEUS</h2>
-        </div>
-
-        {isLoading ? (
-          <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="h-10 rounded bg-slate-800/50 skeleton-loader" />
-              <div className="h-10 rounded bg-slate-800/50 skeleton-loader" />
-              <div className="h-10 rounded bg-slate-800/50 skeleton-loader" />
-              <div className="h-10 rounded bg-slate-800/50 skeleton-loader" />
+      {/* ── LEFT PANEL: Ship Visualization (60%) ── */}
+      <div className="w-[60%] h-full relative flex flex-col">
+        {/* Navbar-like header in the top left */}
+        <div className="absolute top-0 left-0 right-0 z-10 px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🚢</span>
+            <div>
+              <h1 className="text-lg font-black text-slate-800 tracking-tight">THESEUS <span className="text-[#4A90E2] font-semibold">Ship View</span></h1>
+              <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Financial Navigation · Interactive Visualization</p>
             </div>
-            <div className="h-12 rounded bg-slate-800/50 skeleton-loader" />
           </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 gap-2 text-[10px]">
-              <div className="bg-slate-950/40 p-2 rounded border border-slate-800/60">
-                <span className="text-slate-400 block text-[8px] uppercase tracking-wider">Cash Balance</span>
-                <span className="font-extrabold text-white text-xs">{formatINR(summary?.cash_balance ?? 435000)}</span>
-              </div>
-              <div className="bg-slate-950/40 p-2 rounded border border-slate-800/60">
-                <span className="text-slate-400 block text-[8px] uppercase tracking-wider">Runway Days</span>
-                <span className="font-extrabold text-amber-500 text-xs">{summary?.runway_days ?? 75} Days</span>
-              </div>
-              <div className="bg-slate-950/40 p-2 rounded border border-slate-800/60">
-                <span className="text-slate-400 block text-[8px] uppercase tracking-wider">Shortfall Risk</span>
-                <span className="font-extrabold text-rose-500 text-xs">{Math.round((forecast90?.shortfall_risk ?? 0.15) * 100)}%</span>
-              </div>
-              <div className="bg-slate-950/40 p-2 rounded border border-slate-800/60">
-                <span className="text-slate-400 block text-[8px] uppercase tracking-wider">Forecast Spread</span>
-                <span className="font-extrabold text-indigo-400 text-xs">{Math.round((forecast90?.forecast_confidence_volatility ?? 0.18) * 100)}% Vol</span>
-              </div>
-            </div>
+        </div>
 
-            <div className="text-[9.5px] leading-relaxed text-slate-350 bg-slate-950/60 p-2 rounded border border-slate-800/80">
-              <strong className="text-blue-400 font-bold block">Course Direction Recommendation:</strong>
-              {recommendations?.[0]?.description || 'Runway stable. Clear Acme outstanding invoice.'}
-            </div>
-          </>
-        )}
+        <div className="flex-1 relative overflow-hidden mt-16">
+          {!isLoading && (
+            <ShipView
+              cashBalance={summary?.cash_balance ?? 435000}
+              maxCashBalance={800000}
+              runwayDays={summary?.runway_days ?? 75}
+              forecastVolatility={forecast90?.forecast_confidence_volatility ?? 0.18}
+              shortfallRisk={forecast90?.shortfall_risk ?? 0.15}
+              icebergs={computedIcebergs}
+              islands={computedIslands}
+              anomalySpikes={computedSpikes}
+              recommendationSummary={recommendations?.[0]?.description || 'Runway stable. Clear Acme outstanding invoice.'}
+              showAnnotations={true}
+              loading={isLoading}
+            />
+          )}
+        </div>
       </div>
 
-      {/* Main Full-Screen Ship Canvas */}
-      <div className="w-full h-full">
-        <ShipView
-          cashBalance={summary?.cash_balance ?? 435000}
-          maxCashBalance={800000}
-          runwayDays={summary?.runway_days ?? 75}
-          forecastVolatility={forecast90?.forecast_confidence_volatility ?? 0.18}
-          shortfallRisk={forecast90?.shortfall_risk ?? 0.15}
-          icebergs={computedIcebergs}
-          islands={computedIslands}
-          anomalySpikes={computedSpikes}
-          recommendationSummary={recommendations?.[0]?.description || 'Runway stable. Clear Acme outstanding invoice.'}
-          showAnnotations={true}
-          onWaterClick={handleWaterClick}
-          onShipClick={handleShipClick}
-          loading={isLoading}
-        />
-      </div>
-
-      {/* Interactive Metaphor Drill-Down Modals */}
-      
-      {/* Water Modal */}
-      <Modal
-        isOpen={modalType === 'water'}
-        onClose={() => setModalType(null)}
-        title="Glanceable Metaphor: Water Level (Cash Flow)"
-      >
-        <div className="space-y-3">
-          <p className="font-bold text-slate-800">Metaphor: Water Level = Total Cash Inflow & Outflow</p>
-          <p className="text-slate-600">
-            A high water level keeps the ship sailing safely above rocky shelves. The depth represents your actual liquid cash balance.
-          </p>
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
-            <div className="flex justify-between">
-              <span>Current Cash Balance:</span>
-              <span className="font-bold text-blue-600">{formatINR(summary?.cash_balance ?? 435000)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Average Monthly Burn:</span>
-              <span className="font-bold text-rose-600">{formatINR(summary?.burn_rate ?? 12000)}</span>
-            </div>
-            <div className="flex justify-between border-t border-slate-200 pt-1 font-bold">
-              <span>Net Movement:</span>
-              <span className="text-emerald-600">{formatINR(summary?.net_cash_flow ?? 45000)}</span>
-            </div>
-          </div>
+      {/* ── RIGHT PANEL: Dashboard (40%) ── */}
+      <div className="w-[40%] h-full bg-[#f8fafc] border-l border-[#E6EAF0] shadow-2xl flex flex-col z-20">
+        
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-[#E6EAF0] bg-white flex justify-end">
+          <button className="px-4 py-1.5 rounded-full border border-[#E6EAF0] text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+            ← Dashboard
+          </button>
         </div>
-      </Modal>
 
-      {/* Ship/Galley Modal */}
-      <Modal
-        isOpen={modalType === 'ship'}
-        onClose={() => setModalType(null)}
-        title="Glanceable Metaphor: Ship Height Above Waterline (Runway)"
-      >
-        <div className="space-y-3">
-          <p className="font-bold text-slate-800">Metaphor: Trireme Draft = Operational Runway</p>
-          <p className="text-slate-650">
-            A ship loaded heavily riding low in the water or listing represents a critically short cash runway. A light, high galley is agile and safe.
-          </p>
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
-            <div className="flex justify-between">
-              <span>Current Liquid Runway:</span>
-              <span className="font-bold text-amber-600">{summary?.runway_days ?? 75} Days</span>
-            </div>
-            <div className="flex justify-between text-slate-500 text-[10px]">
-              <span>Ideal Runway Target:</span>
-              <span>180 Days</span>
-            </div>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Forecast Waves Modal */}
-      <Modal
-        isOpen={modalType === 'forecast'}
-        onClose={() => setModalType(null)}
-        title="Glanceable Metaphor: Water Turbulence & Waves (Forecast Volatility)"
-      >
-        <div className="space-y-3">
-          <p className="font-bold text-slate-850">Metaphor: Waves = Monte Carlo Forecast Volatility</p>
-          <p className="text-slate-600">
-            Calm waters represent a stable, highly confident forecast with low variance. Choppy waves reflect a high forecast spread (P90 vs P10 spread) suggesting unpredictable upcoming flows.
-          </p>
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
-            <div className="flex justify-between">
-              <span>Forecast Confidence Spread:</span>
-              <span className="font-bold text-indigo-650">{Math.round((forecast90?.forecast_confidence_volatility ?? 0.18) * 100)}%</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Simulated Shortfall Probability:</span>
-              <span className="font-bold text-rose-550">{Math.round((forecast90?.shortfall_risk ?? 0.15) * 100)}%</span>
-            </div>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Iceberg Modal */}
-      <Modal
-        isOpen={modalType === 'iceberg'}
-        onClose={() => { setModalType(null); setActiveIceberg(null); }}
-        title={`Metaphor Obstacle: ${activeIceberg?.label || 'Iceberg'}`}
-      >
-        <div className="space-y-3">
-          <p className="font-bold text-slate-800">Resolve Outstanding Invoice Debt to Dissolve Iceberg</p>
-          <p className="text-slate-600">
-            Icebergs represent immediate credit anomalies or outstanding invoices at high risk of payment delay. Draft an instant multilingual reminder:
-          </p>
+        <div className="flex-1 overflow-y-auto p-6 space-y-4 min-h-0">
+          <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Live Props — Demo Controls</h2>
           
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
-            <span className="text-[9px] font-bold text-slate-400 uppercase">Drafted Email Reminder ({selectedLanguage})</span>
-            {draftingInvoice ? (
-              <p className="text-[10px] animate-pulse text-blue-600">Generating translation draft...</p>
-            ) : (
-              <textarea
-                value={invoiceReminderDraft}
-                onChange={(e) => setInvoiceReminderDraft(e.target.value)}
-                className="w-full h-32 bg-white border border-slate-200 rounded p-2 text-[10px] font-mono outline-none focus:border-blue-400 leading-relaxed"
-              />
-            )}
-          </div>
-
-          <div className="flex gap-2 justify-end">
-            <button
-              onClick={() => { setModalType(null); setActiveIceberg(null); }}
-              className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-[10px] font-semibold hover:bg-slate-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => {
-                alert(`Reminder email sent successfully!`);
-                setModalType(null);
-                setActiveIceberg(null);
-              }}
-              className="px-3.5 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-[10px] font-bold shadow-sm"
-            >
-              Send Reminder
-            </button>
+          {/* We will replace this section in Phase 3 with the actual Dashboard redesign */}
+          <div className="bg-white rounded-xl shadow-sm border border-[#E6EAF0] p-4">
+            <p className="text-sm font-bold text-slate-800">Dashboard Components</p>
+            <p className="text-xs text-slate-500 mt-2">To be implemented in Phase 3...</p>
           </div>
         </div>
-      </Modal>
 
+      </div>
     </div>
   );
 }
