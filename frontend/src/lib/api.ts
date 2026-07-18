@@ -28,6 +28,8 @@ export interface DocumentCitation {
   source_name: string;
   category?: string | null;
   excerpt: string;
+  page_number?: number | null;
+  section_label?: string | null;
 }
 
 export interface AskDocumentResponse {

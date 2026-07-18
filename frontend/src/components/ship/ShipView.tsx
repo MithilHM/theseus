@@ -50,6 +50,8 @@ interface ExtendedShipViewProps extends ShipViewProps {
   showAnnotations?: boolean;
   /** Initial loading skeleton state toggle */
   loading?: boolean;
+  /** ID of the KPI card currently being hovered — highlights matching annotation */
+  highlightedCard?: string | null;
 }
 
 /**
@@ -79,6 +81,7 @@ export default function ShipView({
   onShipClick,
   showAnnotations = true,
   loading = false,
+  highlightedCard = null,
 }: ExtendedShipViewProps) {
   // ── SKELETON LOADER STATE ─────────────────────────────────────────────────
   if (loading) {
@@ -163,23 +166,23 @@ export default function ShipView({
   // ── Annotations (matching reference image layout) ─────────────────────────
   const draftPx = 2 + runwayFraction * 12;
   const hullTop = waterY - draftPx - 52;
-  const captainX = shipCX - 155;
-  const captainY = hullTop - 10;
+  const captainX = shipCX - 100;
+  const captainY = hullTop - 17;
 
   const annotations: Annotation[] = showAnnotations ? [
     {
       id: 'ann-captain',
       targetX: captainX,
       targetY: captainY,
-      side: 'left',
+      side: 'top-right',           // box goes RIGHT of target — keeps it inside
       title: 'Gemma as captain',
       lines: ['Graphical'],
       onClick: onShipClick,
     },
     {
       id: 'ann-storm',
-      targetX: VIEW_W * 0.72,
-      targetY: VIEW_H * 0.18,
+      targetX: VIEW_W * 0.60,      // moved left from 0.72 so box fits
+      targetY: VIEW_H * 0.14,
       side: 'top-right',
       title: 'Predicted shortfall risk',
       lines: [
@@ -189,7 +192,7 @@ export default function ShipView({
     },
     {
       id: 'ann-water',
-      targetX: VIEW_W * 0.14,
+      targetX: VIEW_W * 0.22,      // pulled right from 0.14 so box fits
       targetY: waterY + 4,
       side: 'left',
       title: 'Water level',
@@ -200,7 +203,7 @@ export default function ShipView({
     },
     {
       id: 'ann-runway',
-      targetX: shipCX + 100,
+      targetX: shipCX + 80,        // slightly tighter
       targetY: waterY - 70,
       side: 'right',
       title: 'Runway:',
@@ -209,7 +212,7 @@ export default function ShipView({
     },
     {
       id: 'ann-turbulence',
-      targetX: VIEW_W * 0.68,
+      targetX: VIEW_W * 0.58,      // moved left from 0.68 so box fits
       targetY: waterY + 16,
       side: 'right',
       title: 'Water turbulence',
@@ -227,7 +230,7 @@ export default function ShipView({
         viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
         width="100%"
         height="100%"
-        preserveAspectRatio="xMidYMid meet"
+        preserveAspectRatio="xMidYMid slice"
         xmlns="http://www.w3.org/2000/svg"
         aria-label="THESEUS Greek Galley — interactive financial overview"
         role="img"
@@ -304,11 +307,15 @@ export default function ShipView({
 
         {/* ── Iceberg labels (inline for readability) ──────────────────── */}
         {icebergs.map((berg, i) => {
-          const spread = VIEW_W * 0.45;
-          const startX = VIEW_W * 0.05;
+          const spread = VIEW_W * 0.36;
+          const startX = VIEW_W * 0.30;       // was 0.15 — moved right to avoid slice crop
           const bx = icebergs.length === 1
             ? startX + spread * 0.5
             : startX + (i / (icebergs.length - 1)) * spread;
+
+          // Clamp so label box never disappears into the sliced-off left edge
+          const labelX = Math.max(bx - 60, 20);
+          const textX  = labelX + 10;
 
           return (
             <g
@@ -318,7 +325,7 @@ export default function ShipView({
             >
               {/* Annotation box below waterline */}
               <rect
-                x={bx - 60}
+                x={labelX}
                 y={waterY + 50}
                 width={120}
                 height={32}
@@ -328,15 +335,16 @@ export default function ShipView({
                 strokeWidth={1}
                 filter="url(#card-shadow)"
               />
-              <text x={bx - 50} y={waterY + 64} textAnchor="start" fontSize={9} fontWeight="bold" fill={berg.severity === 'high' ? '#991B1B' : '#000'} fontFamily="sans-serif">
+              <text x={textX} y={waterY + 64} textAnchor="start" fontSize={9} fontWeight="bold" fill={berg.severity === 'high' ? '#991B1B' : '#000'} fontFamily="sans-serif">
                 {berg.severity === 'high' ? 'Risk' : berg.severity === 'medium' ? 'Anomaly' : 'Alert'}
               </text>
-              <text x={bx - 50} y={waterY + 76} textAnchor="start" fontSize={8} fill="#334155" fontFamily="sans-serif">
+              <text x={textX} y={waterY + 76} textAnchor="start" fontSize={8} fill="#334155" fontFamily="sans-serif">
                 {berg.label.length > 30 ? berg.label.slice(0, 30) + '…' : berg.label}
               </text>
             </g>
           );
         })}
+
 
         {/* ── Greek Galley ─────────────────────────────────────────────── */}
         <GreekGalley
@@ -409,7 +417,7 @@ export default function ShipView({
         )}
 
         {/* ── Annotation callouts ───────────────────────────────────────── */}
-        <ShipAnnotations annotations={annotations} />
+        <ShipAnnotations annotations={annotations} highlightedCard={highlightedCard} />
       </svg>
     </div>
   );

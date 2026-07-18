@@ -14,25 +14,27 @@ export interface Annotation {
 
 interface Props {
   annotations: Annotation[];
+  highlightedCard?: string | null;
 }
 
-const BOX_W = 130;
+const BOX_W = 150;
 const BOX_PAD = 6;
-const LINE_H = 12;
+const LINE_H = 14;
 
 /**
  * ShipAnnotations
  * ───────────────
  * Renders annotation callout boxes with leader lines pointing to ship elements.
  * Each box has a title (bold) and additional detail lines.
- * The leader line runs from targetX/Y to the edge of the callout box.
+ * When highlightedCard matches an annotation id, it glows and scales.
  */
-export default function ShipAnnotations({ annotations }: Props) {
+export default function ShipAnnotations({ annotations, highlightedCard }: Props) {
   return (
     <g className="ship-annotations" style={{ pointerEvents: 'none' }}>
       {annotations.map((ann) => {
         const lineCount = ann.lines.length + 1; // title + detail lines
         const boxH = lineCount * LINE_H + BOX_PAD * 2 + 4;
+        const isHighlighted = highlightedCard === ann.id;
 
         // Calculate box position based on direction
         let boxX: number;
@@ -62,24 +64,59 @@ export default function ShipAnnotations({ annotations }: Props) {
           : boxX;
         const lineEndY = boxY + boxH / 2;
 
+        // Highlight colours
+        const boxFill = isHighlighted ? '#EFF6FF' : '#FFFFFF';
+        const boxStroke = isHighlighted ? '#3B82F6' : '#E2E8F0';
+        const boxStrokeWidth = isHighlighted ? 2 : 1;
+        const leaderStroke = isHighlighted ? '#3B82F6' : '#94A3B8';
+
         return (
           <g
             key={ann.id}
             onClick={ann.onClick}
-            style={{ pointerEvents: ann.onClick ? 'all' : 'none', cursor: ann.onClick ? 'pointer' : 'default' }}
+            style={{
+              pointerEvents: ann.onClick ? 'all' : 'none',
+              cursor: ann.onClick ? 'pointer' : 'default',
+              // CSS transform for scale-up highlight
+              transform: isHighlighted ? `scale(1.08)` : 'scale(1)',
+              transformOrigin: `${boxX + BOX_W / 2}px ${boxY + boxH / 2}px`,
+              transition: 'transform 0.2s ease',
+            }}
           >
+            {/* Glow halo behind box when highlighted */}
+            {isHighlighted && (
+              <rect
+                x={boxX - 4}
+                y={boxY - 4}
+                width={BOX_W + 8}
+                height={boxH + 8}
+                rx={10}
+                fill="none"
+                stroke="#3B82F6"
+                strokeWidth={3}
+                opacity={0.25}
+              />
+            )}
+
             {/* Leader line */}
             <line
               x1={ann.targetX}
               y1={ann.targetY}
               x2={lineEndX}
               y2={lineEndY}
-              stroke="#94A3B8"
-              strokeWidth={1}
+              stroke={leaderStroke}
+              strokeWidth={isHighlighted ? 1.5 : 1}
               strokeDasharray="2 2"
             />
             {/* Small open circle at target */}
-            <circle cx={ann.targetX} cy={ann.targetY} r={3} fill="none" stroke="#94A3B8" strokeWidth={1} />
+            <circle
+              cx={ann.targetX}
+              cy={ann.targetY}
+              r={isHighlighted ? 4.5 : 3}
+              fill={isHighlighted ? '#3B82F6' : 'none'}
+              stroke={leaderStroke}
+              strokeWidth={1}
+            />
 
             {/* Callout box */}
             <rect
@@ -88,9 +125,9 @@ export default function ShipAnnotations({ annotations }: Props) {
               width={BOX_W}
               height={boxH}
               rx={6}
-              fill="#FFFFFF"
-              stroke="#E2E8F0"
-              strokeWidth={1}
+              fill={boxFill}
+              stroke={boxStroke}
+              strokeWidth={boxStrokeWidth}
               filter="url(#card-shadow)"
             />
 
@@ -98,9 +135,9 @@ export default function ShipAnnotations({ annotations }: Props) {
             <text
               x={boxX + BOX_PAD}
               y={boxY + BOX_PAD + LINE_H - 2}
-              fontSize={8.5}
+              fontSize={10.5}
               fontWeight="bold"
-              fill="#1E293B"
+              fill={isHighlighted ? '#1D4ED8' : '#1E293B'}
               fontFamily="'Inter', sans-serif"
             >
               {ann.title}
@@ -114,7 +151,7 @@ export default function ShipAnnotations({ annotations }: Props) {
                   key={i}
                   x={boxX + BOX_PAD}
                   y={boxY + BOX_PAD + (i + 2) * LINE_H - 2}
-                  fontSize={7.5}
+                  fontSize={9.5}
                   fill="#475569"
                   fontFamily="'Inter', sans-serif"
                 >
