@@ -1,6 +1,8 @@
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List, Dict, Optional
+from sqlalchemy.orm import Session
+from db.session import get_db
 from agents.course_of_action.reasoning import run_copilot_loop
 from agents.course_of_action.recommendations import get_action_recommendations
 from agents.course_of_action.drafting import draft_invoice_reminder
@@ -12,6 +14,7 @@ router = APIRouter()
 class AskRequest(BaseModel):
     org_id: int
     question: str
+    language: Optional[str] = "English"
 
 class AskResponse(BaseModel):
     answer: str
@@ -37,12 +40,12 @@ def get_coa_status():
     return {"status": "healthy", "service": "course_of_action"}
 
 @router.post("/ask", response_model=AskResponse)
-def ask_copilot(request: AskRequest):
+def ask_copilot(request: AskRequest, db: Session = Depends(get_db)):
     """
     General copilot advisor chat which runs the tool-selection reasoning loop.
     """
     try:
-        answer = run_copilot_loop(request.org_id, request.question)
+        answer = run_copilot_loop(request.org_id, request.question, language=request.language or "English", db=db)
         return AskResponse(answer=answer)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
