@@ -40,7 +40,7 @@ class GemmaClient:
             }
             headers = {"Content-Type": "application/json"}
             url = f"{self.text_model_url}?key={self.api_key}"
-            response = requests.post(url, json=payload, headers=headers)
+            response = requests.post(url, json=payload, headers=headers, timeout=8)
             response.raise_for_status()
             res_json = response.json()
             return res_json["candidates"][0]["content"]["parts"][0]["text"]
@@ -301,7 +301,7 @@ class GemmaClient:
             }
             headers = {"Content-Type": "application/json"}
             url = f"{self.embedding_model_url}?key={self.api_key}"
-            response = requests.post(url, json=payload, headers=headers)
+            response = requests.post(url, json=payload, headers=headers, timeout=8)
             response.raise_for_status()
             res_json = response.json()
             return res_json["embedding"]["values"]
