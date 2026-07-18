@@ -20,3 +20,6 @@ Thumbs.db
 *.md
 !README.md
 !frontend/README.md
+
+# Large Datasets
+TableClassifierQuaterlyWithNotes/

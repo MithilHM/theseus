@@ -212,3 +212,24 @@ export async function askDocumentIntelligence(orgId: number, question: string): 
   }
   return res.json();
 }
+
+export async function simulateScenario(orgId: number, scenarioId: number): Promise<{
+  scenario_title: string;
+  description: string;
+  flowchart: {
+    nodes: Array<{ id: string; label: string; metric: string; type: string; impact_level: string }>;
+    edges: Array<{ from: string; to: string; label: string }>;
+  }
+}> {
+  const res = await fetch(`${API_BASE}/course_of_action/simulate-scenario`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ org_id: orgId, scenario_id: scenarioId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to simulate scenario');
+  }
+  return res.json();
+}
+

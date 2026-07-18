@@ -11,7 +11,7 @@ import {
   fetchRecommendations, 
   fetchReminderDraft 
 } from '@/lib/api';
-import RagChatUI from '@/components/dashboard/RagChatUI';
+
 import DataIngestion from '@/components/dashboard/DataIngestion';
 import {
   AreaChart, Area, LineChart, Line, XAxis, YAxis,
@@ -671,8 +671,7 @@ export default function HomePage() {
           </div>
         </div>
       </div>
-      {/* RAG Chat Copilot Widget */}
-      <RagChatUI orgId={ORG_ID} />
+
 
       {/* ── Graph Modal Overlay ── */}
       {openGraphCard && (
