@@ -26,8 +26,7 @@ export interface WeeklyPlan {
 
 export interface DocumentCitation {
   source_name: string;
-  section_label?: string | null;
-  page_number?: number | null;
+  category?: string | null;
   excerpt: string;
 }
 

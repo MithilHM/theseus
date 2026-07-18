@@ -73,3 +73,61 @@ def chunk_document(text: str, chunk_size: int = 400) -> list:
         chunks.append(" ".join(current_chunk))
 
     return chunks
+
+import json
+import logging
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
+
+def embed_and_store_chunks(
+    db: Session,
+    org_id: int,
+    source_name: str,
+    source_type: str,
+    chunks: list,
+    metadata: dict = None
+):
+    """
+    Takes a list of text chunks, generates embeddings using get_embedding,
+    and stores them in the pgvector documents table.
+    """
+    if metadata is None:
+        metadata = {}
+        
+    for idx, chunk_text in enumerate(chunks):
+        if not chunk_text.strip():
+            continue
+            
+        try:
+            # Generate embedding using the existing function
+            embedding = get_embedding(chunk_text)
+            
+            chunk_metadata = metadata.copy()
+            chunk_metadata["chunk_index"] = idx
+            
+            # Store in database
+            sql = text("""
+                INSERT INTO documents (
+                    org_id, source_type, source_name, chunk_text, embedding, metadata
+                ) VALUES (
+                    :org_id, :source_type, :source_name, :chunk_text, :embedding, :metadata
+                )
+            """)
+            
+            db.execute(sql, {
+                "org_id": org_id,
+                "source_type": source_type,
+                "source_name": source_name,
+                "chunk_text": chunk_text,
+                "embedding": str(embedding), # pgvector string cast
+                "metadata": json.dumps(chunk_metadata)
+            })
+            
+        except Exception as e:
+            logger.error(f"Failed to embed/store chunk {idx} for {source_name}: {e}")
+            continue
+            
+    db.commit()
+    logger.info(f"Successfully embedded and stored {len(chunks)} chunks for {source_name}")

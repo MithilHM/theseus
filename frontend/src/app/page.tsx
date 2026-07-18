@@ -10,6 +10,7 @@ import {
   fetchRecommendations, 
   fetchReminderDraft 
 } from '@/lib/api';
+import RagChatUI from '@/components/dashboard/RagChatUI';
 
 const ORG_ID = 1;
 
@@ -293,6 +294,8 @@ export default function HomePage() {
         </div>
       </Modal>
 
+      {/* RAG Chat Copilot Widget */}
+      <RagChatUI orgId={ORG_ID} />
     </div>
   );
 }

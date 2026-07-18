@@ -13,6 +13,7 @@ class GemmaClient:
         # Default model endpoints in Gemini API
         self.text_model_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
         self.multimodal_model_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+        self.embedding_model_url = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent"
 
     def complete_text(self, prompt: str) -> str:
         start_time = time.time()
@@ -266,3 +267,33 @@ class GemmaClient:
         """Fallback helper for raw text response from audio analysis"""
         res = self.audio(prompt, audio_bytes)
         return str(res)
+
+    def get_embeddings(self, text: str) -> list[float]:
+        """
+        Generates vector embeddings for a given text string.
+        """
+        start_time = time.time()
+        logger.info("Calling Gemma get_embeddings...")
+        try:
+            if self.mock_mode:
+                return [0.0] * 768
+                
+            payload = {
+                "model": "models/text-embedding-004",
+                "content": {
+                    "parts": [{
+                        "text": text
+                    }]
+                }
+            }
+            headers = {"Content-Type": "application/json"}
+            url = f"{self.embedding_model_url}?key={self.api_key}"
+            response = requests.post(url, json=payload, headers=headers)
+            response.raise_for_status()
+            res_json = response.json()
+            return res_json["embedding"]["values"]
+        except Exception as e:
+            logger.error(f"Gemma get_embeddings error: {str(e)}")
+            raise RuntimeError(f"Gemma embedding call failed: {str(e)}")
+        finally:
+            logger.info(f"Gemma get_embeddings execution time: {time.time() - start_time:.4f}s")

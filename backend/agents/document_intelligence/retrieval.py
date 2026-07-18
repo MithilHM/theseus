@@ -1,4 +1,6 @@
 import numpy as np
+import json
+from sqlalchemy import text
 from agents.document_intelligence.embeddings import get_embedding
 
 # Simple in-memory fallback store for the hackathon / testing
@@ -36,27 +38,27 @@ def retrieve_context(org_id: int, query: str, k: int = 5, db = None) -> list:
     try:
         # Utilizing pgvector cosine distance `<=>` operator (1 - similarity)
         # We order by distance ascending (meaning similarity descending)
-        raw_results = db.execute(
-            "SELECT chunk_text, source_name, section_label, page_number, (embedding <=> :query_vec) as distance "
-            "FROM documents WHERE org_id = :org_id "
-            "ORDER BY distance ASC LIMIT :limit",
-            {
-                "query_vec": str(query_vector),
-                "org_id": org_id,
-                "limit": k
-            }
-        ).fetchall()
+        sql = text("""
+            SELECT chunk_text, source_name, metadata, (embedding <=> :query_vec) as distance 
+            FROM documents WHERE org_id = :org_id 
+            ORDER BY distance ASC LIMIT :limit
+        """)
+        raw_results = db.execute(sql, {
+            "query_vec": str(query_vector),
+            "org_id": org_id,
+            "limit": k
+        }).fetchall()
         
         docs = []
         for row in raw_results:
+            metadata = row[2] if isinstance(row[2], dict) else (json.loads(row[2]) if row[2] else {})
             docs.append({
                 "chunk_text": row[0],
                 "source_name": row[1],
-                "section_label": row[2],
-                "page_number": row[3],
-                "similarity": 1.0 - float(row[4])
+                "category": metadata.get("category", "unknown"),
+                "similarity": 1.0 - float(row[3])
             })
         return docs
     except Exception as e:
         # Fallback to in-memory on database error
-        return retrieve_context(org_id, query, k, db=None)
+        return []

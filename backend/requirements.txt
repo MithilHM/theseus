@@ -17,3 +17,5 @@ numpy
 scikit-learn
 prophet
 pytest
+confluent-kafka>=2.3.0
+beautifulsoup4>=4.12.0
