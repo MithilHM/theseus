@@ -95,36 +95,108 @@ def simulate_decision_scenario(org_id: int, scenario_id: int) -> dict:
             "Ensure the flowchart branches into at least a positive outcome path (using the P90 value) and a negative risk path (using the P10 value)."
         )
         
-        raw_res = gemma.complete_text(prompt)
+        # Always build a rich flowchart from Monte Carlo numbers - no API key needed!
+        p10 = int(mc_results['p10'])
+        p50 = int(mc_results['p50'])
+        p90 = int(mc_results['p90'])
         
-        # Clean up JSON formatting wrapper if Gemma adds it
-        cleaned = raw_res.strip()
-        if cleaned.startswith("```json"):
-            cleaned = cleaned[7:]
-        if cleaned.endswith("```"):
-            cleaned = cleaned[:-3]
-        cleaned = cleaned.strip()
-        
-        flowchart = json.loads(cleaned)
+        # Determine runway impact labels from MC
+        runway_pessimistic = max(0, int(runway * impact.get("runway_impact_mult", 0.5))) if "runway_impact_mult" in impact else max(0, runway - 20)
+        runway_optimistic = int(runway * impact.get("runway_impact_mult", 1.2)) if "runway_impact_mult" in impact else runway + 20
+
+        flowchart_from_mc = {
+            "nodes": [
+                {
+                    "id": "decision",
+                    "label": scenario["title"],
+                    "metric": f"Current Balance: ₹{int(cash):,}",
+                    "type": "root",
+                    "impact_level": "medium"
+                },
+                {
+                    "id": "optimistic",
+                    "label": "Best Case: Growth & Delivery Speed",
+                    "metric": f"P90 Balance: ₹{p90:,}",
+                    "type": "success",
+                    "impact_level": "low"
+                },
+                {
+                    "id": "expected",
+                    "label": "Expected Case: Moderate Impact",
+                    "metric": f"P50 Balance: ₹{p50:,}",
+                    "type": "neutral",
+                    "impact_level": "medium"
+                },
+                {
+                    "id": "pessimistic",
+                    "label": "Worst Case: Liquidity Crunch",
+                    "metric": f"P10 Balance: ₹{p10:,}",
+                    "type": "failure",
+                    "impact_level": "high"
+                }
+            ],
+            "edges": [
+                {"from": "decision", "to": "optimistic", "label": "If revenue holds (P90)"},
+                {"from": "decision", "to": "expected", "label": "Base case (P50)"},
+                {"from": "decision", "to": "pessimistic", "label": "If cash tightens (P10)"}
+            ]
+        }
+
+        # If we have a real API key, enhance with Gemma narrative (optional)
+        from core.config import settings as _s
+        if _s.GEMMA_API_KEY and not _s.GEMMA_MOCK:
+            prompt = (
+                "You are a financial planning engine analyzing a business scenario.\n"
+                f"Current Baseline:\n"
+                f"- Liquid Cash Balance: ₹{cash}\n"
+                f"- Monthly Burn Rate: ₹{burn}\n\n"
+                f"Proposed Scenario:\n"
+                f"Decision: {scenario['title']}\n"
+                f"Details: {scenario['description']}\n\n"
+                f"90-Day Monte Carlo Projections (Post-Decision):\n"
+                f"- Worst Case (P10): ₹{p10}\n"
+                f"- Expected Case (P50): ₹{p50}\n"
+                f"- Best Case (P90): ₹{p90}\n\n"
+                "Generate a branching decision tree/flowchart in JSON with 'nodes' and 'edges'. "
+                "Respond ONLY with a valid JSON block, no markdown."
+            )
+            try:
+                raw_res = gemma.complete_text(prompt)
+                cleaned = raw_res.strip()
+                if cleaned.startswith("```json"):
+                    cleaned = cleaned[7:]
+                if cleaned.endswith("```"):
+                    cleaned = cleaned[:-3]
+                flowchart_from_mc = json.loads(cleaned.strip())
+            except Exception:
+                pass  # Use the MC-generated flowchart as fallback
+
         return {
             "scenario_title": scenario["title"],
             "description": scenario["description"],
-            "flowchart": flowchart
+            "mc_summary": {
+                "p10": p10,
+                "p50": p50,
+                "p90": p90,
+                "shortfall_risk": round(mc_results.get("shortfall_risk", 0), 2)
+            },
+            "flowchart": flowchart_from_mc
         }
     except Exception as e:
-        # Graceful fallback flowchart if Gemma fails or returns malformed JSON
+        runway = 75  # Safe fallback
         return {
             "scenario_title": scenario["title"],
             "description": scenario["description"],
+            "mc_summary": {"p10": 0, "p50": 0, "p90": 0, "shortfall_risk": 0},
             "flowchart": {
                 "nodes": [
-                  { "id": "start", "label": f"Start Decision: {scenario['title']}", "metric": f"Runway: {runway} Days", "type": "root", "impact_level": "medium" },
-                  { "id": "success", "label": "Path A: Positive growth / Higher ROI", "metric": "Runway increases", "type": "success", "impact_level": "low" },
-                  { "id": "fail", "label": "Path B: Cash constraint / Delayed projects", "metric": "Runway decreases", "type": "failure", "impact_level": "high" }
+                    {"id": "start", "label": f"Decision: {scenario['title']}", "metric": f"Runway: {runway} Days", "type": "root", "impact_level": "medium"},
+                    {"id": "success", "label": "Path A: Positive Growth", "metric": "Runway increases", "type": "success", "impact_level": "low"},
+                    {"id": "fail", "label": "Path B: Cash Constraint", "metric": "Runway decreases", "type": "failure", "impact_level": "high"}
                 ],
                 "edges": [
-                  { "from": "start", "to": "success", "label": "Optimistic Case" },
-                  { "from": "start", "to": "fail", "label": "Pessimistic Case" }
+                    {"from": "start", "to": "success", "label": "Optimistic Case"},
+                    {"from": "start", "to": "fail", "label": "Pessimistic Case"}
                 ]
             }
         }

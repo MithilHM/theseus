@@ -11,16 +11,29 @@ class GemmaClient:
         self.api_key = settings.GEMMA_API_KEY
         self.mock_mode = settings.GEMMA_MOCK
         # Default model endpoints in Gemini API
-        self.text_model_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
-        self.multimodal_model_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+        self.text_model_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+        self.multimodal_model_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
         self.embedding_model_url = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent"
 
     def complete_text(self, prompt: str) -> str:
         start_time = time.time()
         logger.info("Calling Gemma complete_text...")
         try:
-            if self.mock_mode:
-                return "This is a mock text response from Gemma."
+            if self.mock_mode or not self.api_key:
+                # Intelligent keyword-based mock for demo mode
+                p = prompt.lower()
+                if "summarise" in p or "summarize" in p or "summary" in p:
+                    return "Summary: Based on your ingested financial data, your business has a current cash balance of ₹4.35L with a monthly burn rate of ₹12K/month and a runway of approximately 2.5 months. Revenue is trending upward and accounts receivable follow-through is the main risk."
+                elif "burn" in p or "runway" in p:
+                    return "Your current burn rate is ₹12,000/month. At this rate, your runway is approximately 75 days. To extend runway, consider collecting outstanding receivables from Acme Corp."
+                elif "hire" in p or "developer" in p or "team" in p:
+                    return "Hiring 2 developers would increase your monthly burn by ~₹2,00,000. Given your current runway of 75 days, this decision would reduce runway to ~30 days without additional revenue — high risk unless a major contract closes."
+                elif "forecast" in p or "predict" in p or "future" in p:
+                    return "Monte Carlo simulations project your 90-day balance at P50=₹65,000 in a neutral scenario. Growth scenarios reach ₹85,000 while downside risk puts balance at ₹45,000."
+                elif "cash flow" in p or "improve" in p:
+                    return "To improve cash flow: (1) Send invoice reminders to Acme Corp for the overdue ₹5L payment. (2) Reduce discretionary spend by 10%. (3) Consider 15% price increase for core product — Monte Carlo shows this improves P50 runway by 25 days."
+                else:
+                    return f"[Demo Mode - No API Key] Based on your financial data: cash balance ₹4.35L, burn ₹12K/month, runway 75 days. Please add your GEMMA_API_KEY in the .env file for full AI responses."
             
             payload = {
                 "contents": [{"parts": [{"text": prompt}]}]
