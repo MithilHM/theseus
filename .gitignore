@@ -15,3 +15,8 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+
+# Documentation & IDE Plans
+*.md
+!README.md
+!frontend/README.md
