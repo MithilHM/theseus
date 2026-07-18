@@ -9,10 +9,11 @@ import {
   fetchSummary, 
   fetchForecast, 
   fetchRecommendations, 
-  fetchReminderDraft 
+  fetchReminderDraft,
+  askDocumentIntelligence
 } from '@/lib/api';
-import RagChatUI from '@/components/dashboard/RagChatUI';
 import DataIngestion from '@/components/dashboard/DataIngestion';
+import ScenarioGenerator from '@/components/dashboard/ScenarioGenerator';
 import {
   AreaChart, Area, LineChart, Line, XAxis, YAxis,
   Tooltip, ResponsiveContainer, CartesianGrid, Legend,
@@ -53,10 +54,51 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  citations?: any[];
+}
+
 export default function HomePage() {
   const { demoMode } = useDemoMode();
   const [showDataIngestion, setShowDataIngestion] = useState(false);
   const [chatInput, setChatInput] = useState('');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'scenarios'>('dashboard');
+  
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
+    { id: '1', role: 'assistant', content: "Hello! I am Gemma, your financial copilot. Ask me questions about your ingested financial statements, burn rate, or runway!" }
+  ]);
+  const [isChatLoading, setIsChatLoading] = useState(false);
+
+  const handleSendChat = async () => {
+    if (!chatInput.trim() || isChatLoading) return;
+    const q = chatInput.trim();
+    const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', content: q };
+    setChatMessages((prev) => [...prev, userMsg]);
+    setChatInput('');
+    setIsChatLoading(true);
+    
+    try {
+      const res = await askDocumentIntelligence(ORG_ID, q);
+      const assistantMsg: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: res.answer,
+        citations: res.citations
+      };
+      setChatMessages((prev) => [...prev, assistantMsg]);
+    } catch (err) {
+      setChatMessages((prev) => [...prev, {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: "Sorry, I encountered an error communicating with the intelligence service."
+      }]);
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
   
   const { data: summary } = useSWR(
     `summary-${ORG_ID}`, 
@@ -118,12 +160,33 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* ── RIGHT PANEL: Dashboard ── */}
+      {/* ── RIGHT PANEL: Dashboard & Scenarios ── */}
       <div className="w-[45%] h-full bg-[#F8FAFC] flex flex-col z-20 overflow-y-auto">
         
-        {/* Header */}
-        <div className="px-6 py-4 flex justify-between items-center shrink-0">
-          <h2 className="text-lg font-bold text-slate-800">Dashboard Components</h2>
+        {/* Header with Tabs */}
+        <div className="px-6 py-4 flex justify-between items-center shrink-0 border-b border-[#E2E8F0] bg-white">
+          <div className="flex gap-4">
+            <button
+              onClick={() => setActiveTab('dashboard')}
+              className={`text-sm font-bold pb-1 transition-all ${
+                activeTab === 'dashboard'
+                  ? 'text-blue-650 border-b-2 border-blue-500'
+                  : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              Dashboard
+            </button>
+            <button
+              onClick={() => setActiveTab('scenarios')}
+              className={`text-sm font-bold pb-1 transition-all ${
+                activeTab === 'scenarios'
+                  ? 'text-blue-650 border-b-2 border-blue-500'
+                  : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              Scenario Simulator
+            </button>
+          </div>
           <div className="relative">
             <button 
               onClick={() => setShowDataIngestion(!showDataIngestion)}
@@ -139,8 +202,13 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Dashboard Grid Content */}
-        <div className="px-6 pb-6 flex flex-col gap-4">
+        {activeTab === 'scenarios' ? (
+          <div className="flex-1 overflow-y-auto">
+            <ScenarioGenerator orgId={ORG_ID} />
+          </div>
+        ) : (
+          /* Dashboard Grid Content */
+          <div className="px-6 pb-6 pt-4 flex flex-col gap-4">
           
           <div className="grid grid-cols-5 gap-4">
             
@@ -233,50 +301,85 @@ export default function HomePage() {
           </div>
 
           {/* AI Chat Panel */}
-          <div className="bg-white rounded-lg border border-[#E2E8F0] shadow-sm flex flex-col h-[220px]">
-            <div className="p-3 border-b border-[#E2E8F0] flex justify-between items-center">
-              <h3 className="text-[11px] font-bold text-slate-800">AI Chat with Gemma</h3>
+          <div className="bg-white rounded-lg border border-[#E2E8F0] shadow-sm flex flex-col h-[280px]">
+            <div className="p-3 border-b border-[#E2E8F0] flex justify-between items-center bg-slate-50">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center overflow-hidden">
+                  <img src="https://ui-avatars.com/api/?name=Gemma&background=4A90E2&color=fff" alt="Gemma" className="w-full h-full object-cover" />
+                </div>
+                <h3 className="text-[11px] font-bold text-slate-800">AI Chat with Gemma</h3>
+              </div>
               <div className="flex gap-2">
-                <span className="text-slate-400">⛶</span>
-                <span className="text-slate-400">⋯</span>
+                <span className="text-slate-400 text-xs">● Live</span>
               </div>
             </div>
             
             <div className="flex-1 p-4 overflow-y-auto space-y-4">
-              <div className="flex justify-end">
-                <div className="bg-[#D9EAF7] text-slate-800 rounded-lg p-2.5 text-[11px] max-w-[80%] border border-[#C2DFF2]">
-                  How can I improve my cash flow?
+              {chatMessages.map((msg) => (
+                <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start gap-3'}`}>
+                  {msg.role === 'assistant' && (
+                    <div className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden shrink-0 mt-1">
+                      <img src="https://ui-avatars.com/api/?name=Gemma&background=4A90E2&color=fff" alt="Gemma" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                  <div className={`p-2.5 text-[11px] rounded-lg max-w-[85%] border ${
+                    msg.role === 'user' 
+                      ? 'bg-[#D9EAF7] text-slate-800 border-[#C2DFF2]' 
+                      : 'bg-[#F1F5F9] text-slate-700 border-[#E2E8F0]'
+                  }`}>
+                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                    {msg.citations && msg.citations.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-slate-200">
+                        <p className="text-[9px] font-bold text-slate-500 mb-1">SOURCES</p>
+                        <ul className="list-disc pl-3 text-[9px] space-y-0.5 opacity-80">
+                          {msg.citations.map((cite, idx) => (
+                            <li key={idx}>
+                              {cite.source_name} {cite.category ? `(${cite.category})` : ''}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="flex gap-3">
-                <div className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden shrink-0 mt-1">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="https://ui-avatars.com/api/?name=Gemma&background=4A90E2&color=fff" alt="Gemma" className="w-full h-full object-cover" />
+              ))}
+              {isChatLoading && (
+                <div className="flex justify-start gap-3">
+                  <div className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden shrink-0 mt-1">
+                    <img src="https://ui-avatars.com/api/?name=Gemma&background=4A90E2&color=fff" alt="Gemma" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="bg-[#F1F5F9] text-slate-500 rounded-lg p-2.5 text-[11px] border border-[#E2E8F0] flex gap-1 items-center">
+                    <span className="animate-bounce">.</span>
+                    <span className="animate-bounce" style={{ animationDelay: '0.2s' }}>.</span>
+                    <span className="animate-bounce" style={{ animationDelay: '0.4s' }}>.</span>
+                  </div>
                 </div>
-                <div className="bg-[#F1F5F9] text-slate-700 rounded-lg p-2.5 text-[11px] border border-[#E2E8F0]">
-                  Gemma: I how sandlaah: How can I improve my cash flow? and send a sample response deterministic, referenced to this naurual instortramed. The consentions manage lnajuat actions and helo s to inspire the savance monment inatural language my cash flow.
-                </div>
-              </div>
+              )}
             </div>
 
-            <div className="p-3 border-t border-[#E2E8F0] flex items-center gap-3">
+            <div className="p-3 border-t border-[#E2E8F0] flex items-center gap-3 bg-white">
               <span className="text-slate-400 text-lg">📎</span>
               <input 
                 type="text" 
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Type a message..." 
+                onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
+                placeholder="Ask about your financials..." 
                 className="flex-1 text-[11px] outline-none"
               />
-              <button className="text-slate-300">➤</button>
+              <button 
+                onClick={handleSendChat}
+                disabled={isChatLoading || !chatInput.trim()}
+                className="text-blue-500 hover:text-blue-600 disabled:text-slate-300 disabled:cursor-not-allowed font-bold"
+              >
+                ➤
+              </button>
             </div>
           </div>
 
         </div>
+      )}
       </div>
-      
-      {/* RAG Chat Copilot Widget */}
-      <RagChatUI orgId={ORG_ID} />
     </div>
   );
 }

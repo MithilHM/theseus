@@ -6,12 +6,17 @@ from agents.course_of_action.recommendations import get_action_recommendations
 from agents.course_of_action.drafting import draft_invoice_reminder
 
 from agents.course_of_action.weekly_plan import generate_weekly_plan
+from agents.course_of_action.scenario_simulator import simulate_decision_scenario
 
 router = APIRouter()
 
 class AskRequest(BaseModel):
     org_id: int
     question: str
+
+class ScenarioRequest(BaseModel):
+    org_id: int
+    scenario_id: int
 
 class AskResponse(BaseModel):
     answer: str
@@ -77,5 +82,16 @@ def get_weekly_plan(org_id: int):
     try:
         plan = generate_weekly_plan(org_id)
         return plan
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/simulate-scenario")
+def simulate_scenario(request: ScenarioRequest):
+    """
+    Runs a tiny-context Gemma simulation for a decision scenario and returns flowchart JSON.
+    """
+    try:
+        res = simulate_decision_scenario(request.org_id, request.scenario_id)
+        return res
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
