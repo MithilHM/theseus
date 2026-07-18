@@ -6,6 +6,8 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/theseus"
     VECTOR_DB: str = "pgvector"
     PINECONE_API_KEY: str = ""
+    DEMO_MODE: bool = True
+    SIMULATED_FEED_INTERVAL_SECONDS: int = 5
 
     class Config:
         env_file = ".env"
